@@ -1,0 +1,175 @@
+
+import "./style.css";
+
+import {
+  auth,
+  db,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut
+} from "./firebase.js";
+
+import {
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  orderBy,
+  serverTimestamp
+} from "firebase/firestore";
+
+// PawPal Application
+const app = document.querySelector("#app");
+
+let currentUser = null;
+let pets = [];
+
+function render() {
+  app.innerHTML = `
+    <header>
+      <h1>🐾 PawPal</h1>
+      <nav>
+        <button onclick="showHome()">Home</button>
+        <button onclick="showPets()">Adopt Pets</button>
+        <button onclick="showLogin()">Login</button>
+      </nav>
+    </header>
+    <main id="content">
+      <h2>Find Your New Best Friend ❤️</h2>
+      <p>Give a loving home to a pet in need.</p>
+      <button onclick="showPets()">Explore Pets</button>
+    </main>
+  `;
+}
+
+window.showHome = render;
+
+window.showLogin = () => {
+  document.querySelector("#content").innerHTML = `
+    <h2>Login / Register</h2>
+    <input id="email" type="email" placeholder="Email">
+    <input id="password" type="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+    <button onclick="register()">Register</button>
+    <p id="message"></p>
+  `;
+};
+
+window.login = async () => {
+  try {
+    const email = document.querySelector("#email").value;
+    const password = document.querySelector("#password").value;
+
+    const result = await signInWithEmailAndPassword(
+      auth, email, password
+    );
+
+    currentUser = result.user;
+    alert("Login successful!");
+    render();
+  } catch (error) {
+    alert(error.message);
+  }
+};
+
+window.register = async () => {
+  try {
+    const email = document.querySelector("#email").value;
+    const password = document.querySelector("#password").value;
+
+    await createUserWithEmailAndPassword(
+      auth, email, password
+    );
+
+    alert("Registration successful!");
+    render();
+  } catch (error) {
+    alert(error.message);
+  }
+};
+
+window.showPets = async () => {
+  const content = document.querySelector("#content");
+
+  content.innerHTML = `
+    <h2>Available Pets 🐶</h2>
+    <div id="pet-list">Loading pets...</div>
+  `;
+
+  try {
+    const snapshot = await getDocs(collection(db, "pets"));
+
+    pets = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+
+    const list = document.querySelector("#pet-list");
+
+    if (!pets.length) {
+      list.innerHTML = "<p>No pets available yet.</p>";
+      return;
+    }
+
+    list.innerHTML = pets.map(pet => `
+      <article>
+        <img
+          src="${escapeHTML(pet.image || "")}"
+          alt="Pet"
+          width="180"
+        >
+        <h3>${escapeHTML(pet.name || "Pet")}</h3>
+        <p>Breed: ${escapeHTML(pet.breed || "Unknown")}</p>
+        <p>Age: ${escapeHTML(String(pet.age || "Unknown"))}</p>
+        <button onclick="adoptPet('${pet.id}')">
+          Adopt Me
+        </button>
+      </article>
+    `).join("");
+
+  } catch (error) {
+    document.querySelector("#pet-list").textContent =
+      "Unable to load pets. Please try again.";
+  }
+};
+
+function escapeHTML(value) {
+  return String(value).replace(/[&<>"']/g, char => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[char]);
+}
+
+window.adoptPet = async (petId) => {
+  if (!auth.currentUser) {
+    alert("Please login first!");
+    showLogin();
+    return;
+  }
+
+  try {
+    await addDoc(collection(db, "adoptionRequests"), {
+      petId,
+      userId: auth.currentUser.uid,
+      email: auth.currentUser.email,
+      status: "Pending",
+      createdAt: serverTimestamp()
+    });
+
+    alert("Adoption request submitted!");
+  } catch (error) {
+    alert("Request failed: " + error.message);
+  }
+};
+
+window.logout = async () => {
+  await signOut(auth);
+  currentUser = null;
+  alert("Logged out successfully!");
+  render();
+};
+
+render();
