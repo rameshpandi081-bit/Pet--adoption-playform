@@ -1,0 +1,7 @@
+
+function adoptPet(petName) {
+  alert(
+    "Thank you for choosing " + petName +
+    "! Please contact us to continue the adoption process."
+  );
+}
