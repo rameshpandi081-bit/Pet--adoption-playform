@@ -1,0 +1,31 @@
+
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Pet Images
+    match /pet-images/{fileName} {
+
+      // Anyone can view pet images
+      allow read: if true;
+
+      // Only admin can upload, update or delete
+      allow write: if request.auth != null
+        && request.auth.token.admin == true
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // User Profile Images
+    match /profile-images/{userId}/{fileName} {
+
+      allow read: if true;
+
+      allow write: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+  }
+}
